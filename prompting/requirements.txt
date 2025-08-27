@@ -1,0 +1,9 @@
+huggingface_hub
+torch
+transformers
+langchain
+pandas
+os
+warning
+nltk
+accelerate
