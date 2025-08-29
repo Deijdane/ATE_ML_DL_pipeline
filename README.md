@@ -1,114 +1,117 @@
-Pipeline de post-processing pour TermSuite
-===============
+# Pipeline de post-processing pour TermSuite
 
-Pipeline d'outils Machine/Deep Learning permetant de classifier et réduire le bruit des résultats de Termsuite et d'extraire les contexte définitoire lié aux termes extraits.
+Ce projet fournit une pipeline d’outils Machine/Deep Learning permettant de classifier et réduire le bruit des résultats de [TermSuite](http://termsuite.github.io/) et d’extraire les contextes définitoires liés aux termes extraits.
 
-==ATTENTION==
+---
 
-Due à une limite de taille de fichier sur le gitbucket, le modèle "base\_de\_bert.pt" ne peut pas être uploadé. Vous pouvez le trouver en téléchargement ici : https://huggingface.co/feyhre/bert_ADE
-Une fois téléchargé, placer le dans le dossier avec le reste des fichiers constituant la pipeline
+## ⚠️ Prérequis
 
-Assurez-vous d'installez les bibliothèques requises (```pip install -r requirements.txt```)
+- **Modèle BERT** : le fichier `base_de_bert.pt` n’est pas présent dans le dépôt (limite GitBucket).  
+  Téléchargez-le ici : https://huggingface.co/feyhre/bert_ADE 
+  Placez-le ensuite dans le même dossier que les scripts de la pipeline.
 
-Créer un dossier results dans le même sous-dossier. Il est utilisé pour stocker les résultats durant l'utilisation de la pipeline complète.
+- **Bibliothèques Python** :  
+  ```bash
+  pip install -r requirements.txt
+  ```
 
+- **Dossier results** : créez un sous-dossier results/ (utilisé pour stocker les sorties intermédiaires).
 
-===============
+## Données attendues
 
-Cette Pipeline Post-precess les résultats de TermSuite, avec pour but principal de réduire le bruit, puit de récupérer les context définitoire lié à ces termes directement dans le même corpus.
-
-Le modèle de classification pour TermSuite se base sur des features compémentaires. Pour assurer un bon fonctionnement de la pipeline, assurez vous de demander les features complémentaires suivantes lors de l'exécution de Termsuite : 
-
- --tsv-properties "documentFrequency,specificity,frequency,IndependantFrequency,Independance,tf-idf,SwtSize"
-
-Votre TSV devrait donc avoir a minima les colones suivantes : 
-"key", "dFreq", "spec", "freq", "iFreq", "ind", "tfIdf", "swtSize"
-
-
-La pipeline a 4 étapes, détaillé plus bas.
-
-### pipeline_full.sh
-
-la pipeline à besoin d'un dossier "results"  dans le même sous_dossier pour stocker les outputs généré durant la production.
+Le modèle de classification repose sur des features complémentaires.
+Lors de l’exécution de TermSuite, demandez les propriétés suivantes :
 
 ```
-./pipeline_full.sh $PATH_INPUT PATH_CORPUS PATH_OUTPUT --RELU_PATH --TS_SEUIL_FREQ --TS_BATCH_SIZE --TS_VAL_THRESH --TS_KEEP_NOISE --BERT_PATH --DE_BATCH_SIZE --DE_VAL_THRESH
+--tsv-properties "documentFrequency,specificity,frequency,IndependantFrequency,Independance,tf-idf,SwtSize"
 ```
 
-détail :
+Votre fichier TSV doit contenir a minima les colonnes suivantes :
+"key, dFreq, spec, freq, iFreq, ind, tfIdf, swtSize"
 
-- PATH_IMPUT : path de l'extration TermSuite.
-- PATH_CORPUS : path du dossier contenant les fichier .txt servant au corpus.
-- PATH_OUTPUT : path pour l'output final (HTML uniquement).
+## Pipeline complète :
 
-- --RELU_PATH : path du modèle ReLU pour la classification TermSuite.
-- --TS_SEUIL_FREQ : Seuil de fréquence pour les termes issues de TermSuite. base = 5. Pour conserver tout les termes, utiliser 0.
-- --TS_BATCH_SIZE : Size des batch pour classification TermSuite. base = 32.
-- --TS_VAL_THRESH : Threshold de confiance du modèle. base = 0.143.
-- --TS_KEEP_NOISE : Booléen (True or False). Défini si le noise est conservé ou jeté.
-
-- --BERT_PATH : path du modèle BERT pour la classification des contextes définitoires.
-- --DE_BATCH_SIZE : Size des batch pour classification des contextes définitoires. base = 32.
-- --DE_VAL_THRESH : Threshold de confiance du modèle. base = 0.5
-
-### ts_classif.py
-
-Classifieur Linear/ReLU à appliquer directement sur les résultats de TermSuite. Le Classifieur calcule une probabilité que chaque terme soit un potentiel concept ou du bruit.
-
-pour l'utiliser :
-
+### 0. pipeline_full.sh
 ```
-ts_classif.py $PATH_INPUT $PATH_OUTPUT --model_path $RELU_PATH --seuil_freq $TS_SEUIL_FREQ --batch_size $TS_BATCH_SIZE --threshold $TS_VAL_THRESH --keep_noise $TS_KEEP_NOISE 
+./pipeline_full.sh $PATH_INPUT $PATH_CORPUS $PATH_OUTPUT \
+    --RELU_PATH ... \
+    --TS_SEUIL_FREQ ... \
+    --TS_BATCH_SIZE ... \
+    --TS_VAL_THRESH ... \
+    --TS_KEEP_NOISE ... \
+    --BERT_PATH ... \
+    --DE_BATCH_SIZE ... \
+    --DE_VAL_THRESH ...
 ```
 
-détail :
+- PATH_INPUT : extraction TermSuite (.tsv)
+- PATH_CORPUS : dossier contenant les fichiers .txt du corpus
+- PATH_OUTPUT : chemin vers le résultat final (HTML)
 
-- PATH_IMPUT : path de l'extration TermSuite.
-- PATH_OUTPUT : path pour l'output.
+Options principales :
 
-- --RELU_PATH : path du modèle ReLU pour la classification TermSuite.
-- --TS_SEUIL_FREQ : Seuil de fréquence pour les termes issues de TermSuite. base = 5. Pour conserver tout les termes, utiliser 0.
-- --TS_BATCH_SIZE : Size des batch pour classification TermSuite. base = 32.
-- --TS_VAL_THRESH : Threshold de confiance du modèle. base = 0.143.
-- --TS_KEEP_NOISE : Booléen (True or False). Défini si le noise est conservé ou jeté.
+- --RELU_PATH : chemin vers le modèle ReLU (classification TermSuite)
+- --TS_SEUIL_FREQ : seuil de fréquence (defaut: 5, 0 = conserver tout)
+- --TS_BATCH_SIZE : taille des batchs (defaut: 32)
+- --TS_VAL_THRESH : seuil de confiance du modèle (defaut: 0.143)
+- --TS_KEEP_NOISE : conserver le bruit (True/False)
+- --BERT_PATH : chemin vers le modèle BERT (classification contextes)
+- --DE_BATCH_SIZE : taille des batchs (defaut: 32)
+- --DE_VAL_THRESH : seuil de confiance du modèle (defaut: 0.5)
 
-### de_prestep.py
+## Étapes de la pipeline
 
-Utilise regex pour collecter les phrases contenant les termes. Prend en input un fichier .csv séparé par ";" contenant au moins une colonne "term". Output un .csv contenant des phrases, les termes trouvés dans ladite phrase (minimum 1, listé), et le document source dont vient la phrase.
+La pipeline comporte 4 grandes étapes.
+
+### 1. ts_classif.py
+
+Classifie les termes extraits par TermSuite (concept vs bruit). Retourne un fichier .csv regroupant une liste de termes validé par le modèle avec leur label de validation et une probabilité représentant la confiance du modèle.
 
 ```
-python de_prestep.py $PATH_IMPUT $PATH_CORPUS $PATH_OUTPUT
+python ts_classif.py $PATH_INPUT $PATH_OUTPUT \
+    --model_path $RELU_PATH \
+    --seuil_freq $TS_SEUIL_FREQ \
+    --batch_size $TS_BATCH_SIZE \
+    --threshold $TS_VAL_THRESH \
+    --keep_noise $TS_KEEP_NOISE
 ```
 
-détail :
+### 2. de_prestep.py
 
-- PATH_IMPUT : Path du fichier d'input .csv.
-- PATH_CORPUS : path du dossier contenant les fichier .txt servant au corpus. Recomande d'utiliser les mêmes que pour TermSuite.
-- PATH_OUTPUT : path pour l'output.
+Récupère, via regex, les phrases contenant les termes. Retourne un fichier .csv avec une liste de phrase, les termes validé présent dans ces phrases et le document source.
 
-### de_classif.py
 
-Classifieur Linear/ReLU à appliquer sur les résultats de de_prestep.py Le Classifieur calcule une probabilité que chaque phrase soit un contexte définitoire.
-Attention, le classifieur ne prend pas en compte les termes présent. Il peut détecter un contexte définitoire qui pourtant appartiendrait à un terme différent de celui associé par de_prestep.py.
- 
 ```
-python de_classif.py $PATH_INPUT $PATH_OUTPUT --model_path $BERT_PATH --batch_size $DE_BATCH_SIZE --threshold $DE_VAL_THRESH
+python de_prestep.py $PATH_INPUT $PATH_CORPUS $PATH_OUTPUT
 ```
 
-- PATH_IMPUT : path du .csv issue de de_prestep.py.
-- PATH_OUTPUT : path pour l'output final (csv).
 
-- --BERT_PATH : path du modèle BERT pour la classification des phrases.
-- --DE_BATCH_SIZE : Size des batch pour classification des phrases. base = 32.
-- --DE_VAL_THRESH : Threshold de confiance du modèle. base = 0.5.
+### 3. de_classif.py
 
-### de_csv_html.py
+Classifie les phrases issues de de_prestep.py (contexte définitoire ou non).
+⚠️ La classification se fait indépendamment du terme associé.
 
-Petit programme simple prennant les résultats de de_classif.py et les transforme en un fichier html lisible
+```
+python de_classif.py $PATH_INPUT $PATH_OUTPUT \
+    --model_path $BERT_PATH \
+    --batch_size $DE_BATCH_SIZE \
+    --threshold $DE_VAL_THRESH
+```
+
+### 4. de_csv_html.py
+
+Convertit les résultats de de_classif.py en fichier HTML lisible.
 
 ```
 python de_csv_html.py $PATH_INPUT $PATH_OUTPUT
 ```
 
-- PATH_IMPUT : path du .csv issue de de_classif.py.
-- PATH_OUTPUT : path pour l'output final (HTML).
+## Résumé
+
+- Préparer les données TermSuite (TSV avec features complémentaires)
+
+- Créer results/ et télécharger base_de_bert.pt
+
+- Lancer la pipeline complète avec pipeline_full.sh
+
+- Obtenir un HTML final contenant les contextes définitoires.
